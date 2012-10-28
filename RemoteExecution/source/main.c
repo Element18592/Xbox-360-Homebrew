@@ -1,8 +1,17 @@
-// Get binary data over serial, store it in memory, execute it from memory.
-// Written by UNIX - LibXenon.org
-
-// TODO: Test.
-
+/* This code is highly experimental and has never been
+\\ tested!
+\\
+\\ The end goal for this code is to allow developers to
+\\ upload their code over the serial console, rather than
+\\ have to constantly manually reset the console and boot via
+\\ USB or TFTP.
+\\
+\\ Ideally, put this executable on USB, boot to it, modify code
+\\ on the computer, then upload code when changes have been made.
+\\ 
+\\ Written by: UNIX (Tyler Kuck, tylerjkuck@gmail.com)
+\\ 
+*/
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -15,6 +24,7 @@
 #include <time/time.h>
 
 // An array of bytes containing the ELF magic number.
+// Or, fairy magic.
 unsigned char ELF_MAGIC[4] = {'E', 'L', 'F'};
 
 // Variable used to store ELF check pass or fail.
@@ -31,6 +41,8 @@ void checkIsELF(void *memoryAddress){
 
 	// Check the checksumBuffer against the magic number.
 	if(checksumBuffer == ELF_MAGIC) isELF = 1;
+
+	// If we get here, something went wrong.
 	else exit(-2);
 }
 
@@ -46,38 +58,49 @@ int main(){
 	void *tempAddress = malloc(0x1000000);
 	unsigned char *elfAddress = malloc(sizeof(tempAddress));
 
-	while(1){
-		// Print status.
-		printf("Reading");
-		printf(".");
+	// Lazy
+	Lazy:
 
-		// Variable to hold read binary data.
-		unsigned char data = getch();
+	// If we receive a command, start the data reading loop.
+	if(kbhit()){
+		while(1){
+			// Print status.
+			printf("Reading");
+			printf(".");
 
-		// Instantiate a counter for the number of bytes we have read.
-		long int bytesRead = 0;
+			// Variable to hold read binary data.
+			unsigned char data = getch();
 
-		// Up the counter of the number of bytes we have read.
-		bytesRead++;
-		int numBytes = bytesRead;
+			// Instantiate a counter for the number of bytes we have read.
+			long int bytesRead = 0;
 
-		// Copy data to memory buffer.
-		memcpy(tempAddress, data, numBytes);
+			// Up the counter of the number of bytes we have read.
+			bytesRead++;
+			int numBytes = bytesRead;
 
-		/* If no more data is being received, perform ELF check.
-		   If check passes, copy temporary buffer contents to 
-		   final buffer, free temporary buffer, and execute
-		   the elf from final memory address.
-		*/
-		if(data == NULL){
-			checkIsELF(tempAddress);
+			// Copy data to memory buffer.
+			memcpy(tempAddress, data, numBytes);
 
-			if(isELF == 1){
-				printf("do nothing");
+			/* If no more data is being received, perform ELF check.
+			   If check passes, copy temporary buffer contents to 
+			   final buffer, free temporary buffer, and execute
+			   the elf from final memory address.
+			*/
+			if(data == NULL){
+				checkIsELF(tempAddress);
+	
+				if(isELF == 1){
+					memcpy(elfAddress, tempAddress, numBytes);
+					elf_runFromMemory (elfAddress, numBytes);
+				}
 			}
 		}
 	}
+	else if(!kbhit()){
+		goto Lazy;
+	}
 
+	// If we get here, something went wrong.
 	return 0;
 }
 
